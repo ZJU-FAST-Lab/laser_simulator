@@ -6,6 +6,7 @@ A lightweight laser simulator.
 </p>
 
 
-##Usage
+## Usage
 Change the __odom_topic__ and __global_map_topic__ in __/launch/laser_sim.launch__ to fit your own.
 
+GPU version on the way...
