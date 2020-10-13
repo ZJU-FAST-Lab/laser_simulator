@@ -24,10 +24,11 @@ ros::Timer _local_sensing_timer;
 
 bool _has_global_map(false);
 bool _has_odom(false);
+bool _use_resolution_filter(true);
 
 nav_msgs::Odometry _odom;
 
-double _sensing_horizon, _sensing_rate;
+double _sensing_horizon, _sensing_rate, _pc_resolution;
 
 int _hrz_laser_line_num, _vtc_laser_line_num;
 double _hrz_resolution_rad, _vtc_resolution_rad, _vtc_laser_range_rad;
@@ -144,10 +145,35 @@ void renderSensedPoints(const ros::TimerEvent &event)
         continue;
       Eigen::Vector3d pt_vec(pt.x - _odom.pose.pose.position.x, pt.y - _odom.pose.pose.position.y, pt.z - _odom.pose.pose.position.z);
       double dis_curr_pt = pt_vec.norm();
-      if (dis_curr_pt < dis_map(idx[0], idx[1]))
+      
+      if (_use_resolution_filter)
       {
-        idx_map(idx[0], idx[1]) = i;
-        dis_map(idx[0], idx[1]) = dis_curr_pt;
+        double mesh_len_hrz = dis_curr_pt * _hrz_resolution_rad;
+        double mesh_len_vtc = dis_curr_pt * _vtc_resolution_rad;
+        int hrz_occ_grid_num = floor(_pc_resolution / mesh_len_hrz);
+        int vtc_occ_grid_num = floor(_pc_resolution / mesh_len_vtc);
+        // ROS_INFO_STREAM("hrz_occ_grid_num " << hrz_occ_grid_num / 2 << ", vtc_occ_grid_num " << vtc_occ_grid_num / 2);
+        int tmp1 = hrz_occ_grid_num, tmp2 = vtc_occ_grid_num;
+        for (int d_hrz_idx = -tmp1; d_hrz_idx <= tmp1; ++d_hrz_idx)
+          for (int d_vtc_idx = -tmp2; d_vtc_idx <= tmp2; ++d_vtc_idx)
+          {
+            int hrz_idx = (idx[0] + d_hrz_idx + _hrz_laser_line_num) % _hrz_laser_line_num;
+            int vtc_idx = (idx[1] + d_vtc_idx + _vtc_laser_line_num) % _vtc_laser_line_num;
+            // ROS_INFO_STREAM("hrz_idx " << hrz_idx << ", vtc_idx " << vtc_idx);
+            if (dis_curr_pt < dis_map(hrz_idx, vtc_idx))
+            {
+              idx_map(hrz_idx, vtc_idx) = i;
+              dis_map(hrz_idx, vtc_idx) = dis_curr_pt;
+            }
+          } 
+      }
+      else
+      {
+        if (dis_curr_pt < dis_map(idx[0], idx[1]))
+        {
+          idx_map(idx[0], idx[1]) = i;
+          dis_map(idx[0], idx[1]) = dis_curr_pt;
+        }
       }
     }
     // ROS_INFO("render cost %lf ms.", (ros::Time::now().toSec() - this_time) * 1000.0f);
@@ -185,6 +211,8 @@ int main(int argc, char **argv)
 
   nh.getParam("sensing_horizon", _sensing_horizon);
   nh.getParam("sensing_rate", _sensing_rate);
+  nh.getParam("pc_resolution", _pc_resolution);
+  nh.getParam("use_resolution_filter", _use_resolution_filter);
 
   nh.getParam("hrz_laser_line_num", _hrz_laser_line_num);
   nh.getParam("vtc_laser_line_num", _vtc_laser_line_num);
