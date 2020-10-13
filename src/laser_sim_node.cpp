@@ -99,7 +99,7 @@ void rcvGlobalPointCloudCallBack(const sensor_msgs::PointCloud2 &pointcloud_map)
   pcl::PointCloud<pcl::PointXYZ> cloud_input;
   pcl::fromROSMsg(pointcloud_map, cloud_input);
 
-  _voxel_sampler.setLeafSize(0.1f, 0.1f, 0.1f);
+  _voxel_sampler.setLeafSize(_pc_resolution, _pc_resolution, _pc_resolution);
   _voxel_sampler.setInputCloud(cloud_input.makeShared());
   _voxel_sampler.filter(_cloud_all_map);
 
