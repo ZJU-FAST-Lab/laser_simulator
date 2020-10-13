@@ -150,15 +150,17 @@ void renderSensedPoints(const ros::TimerEvent &event)
       {
         double mesh_len_hrz = dis_curr_pt * _hrz_resolution_rad;
         double mesh_len_vtc = dis_curr_pt * _vtc_resolution_rad;
-        int hrz_occ_grid_num = floor(_pc_resolution / mesh_len_hrz);
-        int vtc_occ_grid_num = floor(_pc_resolution / mesh_len_vtc);
+        int hrz_occ_grid_num = std::min((int)floor(_pc_resolution / mesh_len_hrz), _hrz_laser_line_num);
+        int vtc_occ_grid_num = std::min((int)floor(_pc_resolution / mesh_len_vtc), _vtc_laser_line_num);
         // ROS_INFO_STREAM("hrz_occ_grid_num " << hrz_occ_grid_num / 2 << ", vtc_occ_grid_num " << vtc_occ_grid_num / 2);
         int tmp1 = hrz_occ_grid_num, tmp2 = vtc_occ_grid_num;
         for (int d_hrz_idx = -tmp1; d_hrz_idx <= tmp1; ++d_hrz_idx)
           for (int d_vtc_idx = -tmp2; d_vtc_idx <= tmp2; ++d_vtc_idx)
           {
-            int hrz_idx = (idx[0] + d_hrz_idx + _hrz_laser_line_num) % _hrz_laser_line_num;
-            int vtc_idx = (idx[1] + d_vtc_idx + _vtc_laser_line_num) % _vtc_laser_line_num;
+            int hrz_idx = (idx[0] + d_hrz_idx + _hrz_laser_line_num) % _hrz_laser_line_num; // it's a ring in hrz coordiante
+            int vtc_idx = idx[1] + d_vtc_idx;
+            if (vtc_idx >= _vtc_laser_line_num) continue;
+            if (vtc_idx < 0) continue;
             // ROS_INFO_STREAM("hrz_idx " << hrz_idx << ", vtc_idx " << vtc_idx);
             if (dis_curr_pt < dis_map(hrz_idx, vtc_idx))
             {
