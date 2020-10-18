@@ -73,6 +73,18 @@ inline bool pt2LaserIdx(Eigen::Vector2i &idx, const Eigen::Vector3d &pt, const E
   return true;
 }
 
+inline void idx2Pt(int x, int y, const Eigen::Vector3d &t, const Eigen::Matrix3d &R, double dis, Eigen::Vector3d &pt)
+{
+  double vtc_rad = y * _vtc_resolution_rad - _vtc_laser_range_rad / 2.0;
+  double hrz_rad = x * _hrz_resolution_rad - M_PI;
+  double z_in_laser_coor = sin(vtc_rad) * dis;
+  double xy_square_in_laser_coor = cos(vtc_rad) * dis;
+  double x_in_laser_coor = cos(hrz_rad) * xy_square_in_laser_coor;
+  double y_in_laser_coor = sin(hrz_rad) * xy_square_in_laser_coor;
+  Eigen::Vector3d pt_in_laser_coor(x_in_laser_coor, y_in_laser_coor, z_in_laser_coor);
+  pt = R * pt_in_laser_coor + t;
+}
+
 void rcvOdometryCallbck(const nav_msgs::Odometry &odom)
 {
   /*if(!_has_global_map)
@@ -148,8 +160,10 @@ void renderSensedPoints(const ros::TimerEvent &event)
       
       if (_use_resolution_filter)
       {
-        double mesh_len_hrz = dis_curr_pt * _hrz_resolution_rad;
-        double mesh_len_vtc = dis_curr_pt * _vtc_resolution_rad;
+        double vtc_rad = idx[1] * _vtc_resolution_rad - _vtc_laser_range_rad / 2.0;
+        double dis_to_z_axis = dis_curr_pt * cos(vtc_rad);
+        double mesh_len_hrz = dis_to_z_axis * _hrz_resolution_rad;
+        double mesh_len_vtc = dis_to_z_axis * _vtc_resolution_rad;
         int hrz_occ_grid_num = std::min((int)floor(_pc_resolution / mesh_len_hrz), _hrz_laser_line_num);
         int vtc_occ_grid_num = std::min((int)floor(_pc_resolution / mesh_len_vtc), _vtc_laser_line_num);
         // ROS_INFO_STREAM("hrz_occ_grid_num " << hrz_occ_grid_num / 2 << ", vtc_occ_grid_num " << vtc_occ_grid_num / 2);
@@ -182,12 +196,28 @@ void renderSensedPoints(const ros::TimerEvent &event)
     for (int x = 0; x < _hrz_laser_line_num; ++x)
       for (int y = 0; y < _vtc_laser_line_num; ++y)
       {
+        /* use map cloud pts as laser pts
         if (idx_map(x, y) == -1)
           continue;
-        // ROS_WARN_STREAM("idx_map(x, y): " << idx_map(x, y));
-        // ROS_WARN_STREAM("_pointIdxRadiusSearch[idx_map(x, y)]: " << _pointIdxRadiusSearch[idx_map(x, y)]);
         pt = _cloud_all_map.points[_pointIdxRadiusSearch[idx_map(x, y)]];
         _local_map.points.push_back(pt);
+        */
+        
+        // use laser line pts
+        Eigen::Vector3d p;
+        if (idx_map(x, y) == -1)
+        {
+          idx2Pt(x, y, laser_t, rot, _sensing_horizon + _pc_resolution, p);
+          pt.x = p[0]; pt.y = p[1]; pt.z = p[2];
+          _local_map.points.push_back(pt);
+        }
+        else
+        {
+          idx2Pt(x, y, laser_t, rot, dis_map(x, y), p);
+          pt.x = p[0]; pt.y = p[1]; pt.z = p[2];
+          // pt = _cloud_all_map.points[_pointIdxRadiusSearch[idx_map(x, y)]];
+          _local_map.points.push_back(pt);
+        }
       }
   }
   else
