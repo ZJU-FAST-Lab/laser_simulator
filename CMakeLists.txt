@@ -32,5 +32,14 @@ add_executable(
 target_link_libraries( 
   laser_sim_node
   ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
+)
+
+add_executable(
+  transmit_odom_node
+  src/transmit_odom.cpp
+)
+
+target_link_libraries( 
+  transmit_odom_node
+  ${catkin_LIBRARIES}
 )
